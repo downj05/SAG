@@ -11,9 +11,14 @@ A tutorial video **how to setup the program --->** [tutorial](https://youtu.be/i
 Follow these steps to get started with Steam-Account-generator BETA:
 
 1. Download the program from GitHub
-2. Download the latest stable version of [chromedriver](https://chromedriver.chromium.org/)
+2. Download the latest stable version of [chromedriver](https://chromedriver.chromium.org/) **Check Important**
 3. Unpack Chromedriver to your program location folder
 4. Run the program and start generating accounts
+
+## Important 17.09
+If you are using **chrome version 116** and above, you no longer need to download [chromedriver](https://chromedriver.chromium.org/).
+With **chrome version 116 and above, make sure you have Selenium 4.12 installed**.
+I will delete this section in 2 weeks and update my tutorial video.
 
 ## Help and Support
 If you encounter any issues or have questions about using the program, don't hesitate to reach out for help. Contact me through Discord, and I'll be happy to assist you.

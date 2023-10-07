@@ -8,7 +8,7 @@ Generate multiple Steam accounts quickly and easily with Steam-Account-generator
 
 ## Getting Started
 A tutorial video **how to SETUP the program ->** [tutorial how-to-setup](https://youtu.be/RW3VNQ9cuac).
-A tutorial video **how to USE the program ->** [tutorial how-to-use](https://mega.nz/file/WWBF3Sob#udu8CpuSbCAKX4OvOxgaJHnIBFFWUTmE29yQjvYWXaQ). (Youtube blocked my vid)
+A tutorial video **how to USE the program ->** [tutorial how-to-use](https://vimeo.com/872169291?share=copy).
 
 ## Help and Support
 If you encounter any issues or have questions about using the program, don't hesitate to reach out for help. Contact me through Discord, and I'll be happy to assist you.

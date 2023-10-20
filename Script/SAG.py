@@ -1,240 +1,263 @@
 import os
-import string
 import random
-import time
-import numpy as np
-import keyboard as BasicBoard
-import pandas as pd
+import string
+from time import sleep, time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from discord import SyncWebhook
-import pathlib
+import discord
+from selenium_stealth import stealth
+from random_user_agent.user_agent import UserAgent
+from random_user_agent.params import SoftwareName, OperatingSystem
+from colorama import init, Fore, Back, Style
+import traceback
+import argparse
+import yaml
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-e",
+    "--emails",
+    help="File to read emails from, email will be removed from file after use",
+    required=False,
+)
+parser.add_argument(
+    "-w", "--webhooktest", help="Test webhook", required=False, action="store_true"
+)
+
+parser.add_argument(
+    "-c", "--config", help="Config file", required=False, default="config.yml"
+)
+
+args = parser.parse_args()
+
+init(autoreset=True)
+
+# Import config.yml
+with open(args.config, "r") as f:
+    config = yaml.safe_load(f)
+
+WEBHOOK_URL = config["webhook"]
+if WEBHOOK_URL == "" or WEBHOOK_URL is None:
+    print("Please enter a discord webhook url in webhook.txt")
+    exit(1)
+WEBHOOK_BRAND = config["webhook_brand"]
+if WEBHOOK_BRAND == "" or WEBHOOK_BRAND is None:
+    WEBHOOK_BRAND = "W32 Account Generator"
+
+FACES = ["x3", ":(", ">.<", ":P"]
+
+software_names = [SoftwareName.CHROME.value]
+operating_systems = [OperatingSystem.WINDOWS.value]
+
+user_agent_rotator = UserAgent(
+    software_names=software_names, operating_systems=operating_systems, limit=100
+)
+
 
 chrome_options = Options()
-chrome_options.add_argument('--log-level=3')
-version = '2.1'
+chrome_options.add_argument("--log-level=3")
+chrome_options.add_argument("--start-maximized")
+chrome_options.add_argument("--window-size=1920,1080")
+chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+chrome_options.add_experimental_option("useAutomationExtension", False)
+
+
+version = "2.2"
 url = "https://store.steampowered.com/join"
-Domain_Input = ''
-clear_line = "cls||clear"
-path = pathlib.Path().resolve()
+path = os.path.dirname(os.path.realpath(__file__))
 
-# FILE FUNCTIONS
-def data_to_csv(email, username, password):
-    data = {"Email": email, "Username": username, "Password": password}
-    df = pd.DataFrame(data, index=[0])
-    file_path = f"{path}\\Created_accounts.csv"
 
-    if not os.path.exists(file_path):
-        df.to_csv(file_path, index=False)
-    else:
-        df.to_csv(file_path, mode='a', index=False, header=False)
+def chunks(xs, n):
+    n = max(1, n)
+    return (xs[i : i + n] for i in range(0, len(xs), n))
 
-def read_accounts_from_csv_file():
-    print('\tReading emails from csv file')
-    file_name = input('\tWhat is the file name(without extension): ')
-    emails = pd.read_csv(f"{path}\\{file_name}.csv")
-    return emails['Email'].tolist()
 
-def create_new_example_file(file_name):
-    data = {'Email':'Testemail@domain.com'}
-    df = pd.DataFrame(data, index=[0])
-    file_path = f"{path}\\{file_name}.csv"
+class Bot:
+    def __init__(self, url):
+        self.url = url
+        print("Creating driver")
+        self.driver = webdriver.Chrome(options=chrome_options)
+        print("Applying stealth")
+        user_agent = user_agent_rotator.get_random_user_agent()
+        print(user_agent)
+        stealth(
+            self.driver,
+            languages=["en-US", "en"],
+            user_agent=user_agent,
+            vendor="Google Inc.",
+            platform="Win32",
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+            fix_hairline=True,
+        )
+        print("Going to url")
+        self.driver.get(self.url)
 
-    if not os.path.exists(file_path):
-        df.to_csv(file_path, index=False)
+    def wait_for_element(self, xpath: str, timeout=4):
+        print("Waiting for element " + xpath)
+        s = time()
+        while True:
+            try:
+                self.driver.find_element(By.XPATH, xpath)
+                break
+            except:
+                sleep(0.5)
+            finally:
+                if time() - s > timeout:
+                    print("Skipping because timeout")
+                    break
 
-def read_webhook():
-    f = open(f"{pathlib.Path().resolve()}\\webhook.txt", "r")
-    return f.readline()
+    def wait_for_click(self, xpath: str):
+        print("Waiting for click on " + xpath)
+        while True:
+            try:
+                self.driver.find_element(By.XPATH, xpath).click()
+                break
+            except:
+                sleep(0.5)
 
-# TIME FUNC
-def sleep(n):
-    time.sleep(n)
+    def wait_for_click_css(self, selector: str, timeout=4):
+        print("Waiting for click on " + selector)
+        s = time()
+        while True:
+            try:
+                self.driver.find_element(By.CSS_SELECTOR, selector).click()
+                print("Clicked on " + selector)
+                break
+            except:
+                sleep(0.5)
+            finally:
+                if time() - s > timeout:
+                    print("Skipping because timeout")
+                    break
 
-# NOTIFICATIONS
-def notification(type_notifi):
-    if type_notifi == "email":
-        key = "m"
-    elif type_notifi == "captcha":
-        key = "c"
-    else:
-        key = "n"
-    print(f'\n\tCheck {type_notifi} to confirm!\n\tPress \"{key}\" to continue!')
-    while True:
-        if BasicBoard.is_pressed(key):
-            break
+    def enter_field(self, xpath: str, text: str):
+        self.wait_for_click(xpath)
+        self.wait_for_type(xpath, text)
+        return
 
-# RANDOM STRINGS
-def random_string(length):
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+    def wait_for_type(self, xpath: str, text: str):
+        print("Typing " + text + " into " + xpath)
+        while True:
+            try:
+                e = self.driver.find_element(By.XPATH, xpath)
+                break
+            except:
+                sleep(0.5)
+        for x in chunks(text, 4):
+            e.send_keys(x), sleep(random.uniform(0, 0.05))
+        return
 
-def random_password(length):
-    return random_string(length)
+    def close(self):
+        self.driver.close()
 
-def random_domain_email(domain):
-    username = random_string(8)
-    return f"{username}@{domain}"
 
-# DATA INPUTS
-def launch_option(option):
-    if option == 'domain' or option == 'new_account':
-        email, username, password = data_return(option)
-        create_steam_account(email.lower(), username.lower(), password)
-    else:
-        email_list = data_return(option)
-        for i in range(len(email_list)):
-            print(f"\tGenerating account nr {i+1}")
-            create_steam_account(email_list[i].lower(), email_list[i].split("@")[0].lower(), random_password(14))
-
-def data_return(x):
-    if x == "domain":
-        email, username, password = user_domain()
-        return email, username, password
-    elif x == 'new_account':
-        email = input('\tEnter your email: ')
-        username = email.split("@")[0]
-        password = random_password(14)
-        return email, username, password
-    else:
-        emails_list = read_accounts_from_csv_file()
-        return emails_list
-
-def user_domain():
-    global Domain_Input
-    if Domain_Input == '':
-        Domain_Input = input("\tInput domain: ")
-        email = random_domain_email(Domain_Input)
-    else:
-        email = random_domain_email(Domain_Input)
-    username = email.split("@")[0]
-    password = random_password(14)
-    return email, username, password
-
-# WEBHOOK
 def send_to_webhook(email, username, password):
-    webhook_url = read_webhook()
-    if webhook_url == 'INSTEAD OF THIS LINE PUT YOUR DISCORD WEBHOOK TO GET NOTIFICATIONS!' or webhook_url == "":
-        print(f"\tInvalid webhook, change in webhook.txt if you would like to.\n\tContinue...")
-    else:
-        webhook = SyncWebhook.from_url(webhook_url)
-        webhook.send(f"Steam account created\nEmail: {email}\nUsername: {username}\nPassword: {password}")
+    webhook = discord.SyncWebhook.from_url(WEBHOOK_URL)
+    embed = discord.Embed(title="New Steam Account!", color=0xEE00FF)
+    embed.set_author(name=f"{WEBHOOK_BRAND} Account Generator")
+    embed.add_field(name="Username", value=username, inline=True)
+    embed.add_field(name="Password", value=password, inline=True)
+    embed.add_field(name="Email", value=email, inline=False)
+    webhook.send(embed=embed)
 
-# MESSAGE
-def welcome_message():
-    print('')
-    print('--------------------------------------------------')
-    print(f'| WELCOME TO STEAM-ACCOUNT-GENERATOR VERSION {version} |')
-    print('--------------------------------------------------')
-    print('')
-    list_message = [[1, "create accounts from file"], [2, "create new account each time"], [3, "create accounts using your domain"], [4, "Create example file"], [5, "HELP"], [6, "Contact info"]]
-    column = ["Options", "Description"]
-    df = pd.DataFrame(list_message, columns=column)
-    print(df.to_string(index=False))
 
-def Help():
-    # advanced descriptions of functions NEEDS TO BE DONE
-    print('\n\tHELP')
-    print('\tOption domain supports custom user domains')
+def test_webhook():
+    webhook = discord.SyncWebhook.from_url(WEBHOOK_URL)
+    embed = discord.Embed(
+        title="Webhook Test",
+        description="This is a test for the webhook feature of the account generator.",
+        color=0xA6A6A6,
+    )
+    embed.set_author(name=f"{WEBHOOK_BRAND} Account Generator")
+    embed.set_footer(text=random.choice(FACES))
+    webhook.send(embed=embed)
 
-def Contact():
-    print('\n\tContact information')
-    print('\tdiscord: lilkajt#6121')
+
+def error_webhook(email, username, password, error):
+    webhook = discord.SyncWebhook.from_url(WEBHOOK_URL)
+    embed = discord.Embed(
+        title=f"Error Making Account! {random.choice(FACES)}",
+        description="Posting error so we don't lose the credentials incase the account was already made!",
+        color=0xFF0000,
+    )
+    embed.set_author(name=f"{WEBHOOK_BRAND} Account Generator")
+    embed.add_field(name="Username", value=username, inline=True)
+    embed.add_field(name="Password", value=password, inline=True)
+    embed.add_field(name="Email", value=email, inline=False)
+    embed.set_footer(text=error)
+    webhook.send(embed=embed)
+
+
+def random_string(length):
+    pool = string.ascii_letters + string.digits
+    return "".join(random.choice(pool) for i in range(length))
+
 
 # GENERATOR
 def create_steam_account(email, username, password):
-    sleep(np.random.uniform(0, 0.1))
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get(url)
-    sleep(6)
-    driver.find_element(By.XPATH, '//*[@id="email"]').click()
-    for x in email: driver.find_element(By.XPATH, '//*[@id="email"]').send_keys(x), sleep(np.random.uniform(0, 0.1))
-    sleep(0.5)
-    driver.find_element(By.XPATH, '//*[@id="reenter_email"]').click()
-    for x in email: driver.find_element(By.XPATH, '//*[@id="reenter_email"]').send_keys(x), sleep(np.random.uniform(0, 0.1))
-    sleep(0.5)
-    driver.find_element(By.XPATH, '//*[@id="i_agree_check"]').click()
-    notification("captcha")
-    print("\n\tCaptcha confirmed!")
-    driver.find_element(By.XPATH, '//*[@id="createAccountButton"]').click()
-    notification("email")
-    print("\n\tEmail confirmed!")
-    sleep(2)
-    driver.find_element(By.XPATH, '//*[@id="accountname"]').click()
-    for x in username: driver.find_element(By.XPATH, '//*[@id="accountname"]').send_keys(x), sleep(np.random.uniform(0, 0.1))
-    sleep(0.5)
-    driver.find_element(By.XPATH, '//*[@id="password"]').click()
-    for x in password: driver.find_element(By.XPATH, '//*[@id="password"]').send_keys(x), sleep(np.random.uniform(0, 0.1))
-    sleep(0.5)
-    driver.find_element(By.XPATH, '//*[@id="reenter_password"]').click()
-    for x in password: driver.find_element(By.XPATH, '//*[@id="reenter_password"]').send_keys(x), sleep(np.random.uniform(0, 0.1))
-    username = name_check(driver, username)
-    sleep(2)
-    driver.find_element(By.XPATH, '//*[@id="createAccountButton"]').click()
-    sleep(7)
-    print("\tAccount successfully created")
-    data_to_csv(email, username, password)
-    send_to_webhook(email, username, password)
-    driver.close()
+    try:
+        print(
+            f"{Fore.LIGHTYELLOW_EX}Making account with {email} | {username} | {password}"
+        )
+        bot = Bot(url=url)
+        bot.enter_field('//*[@id="email"]', email)
+        bot.enter_field('//*[@id="reenter_email"]', email)
 
-def name_check(driver, og_username):
-    if driver.find_element(By.ID, 'accountname_availability').text == "Not Available":
+        bot.wait_for_click('//*[@id="i_agree_check"]')
+
+        prompt = "PLEASE COMPLETE THE CAPTCHA AND EMAIL VERIFICATION AND PRESS CONTINUE ON THE SITE"
+        print(Fore.LIGHTCYAN_EX + "#" * len(prompt))
+        print(Style.BRIGHT + Fore.WHITE + prompt)
+        print(Fore.LIGHTCYAN_EX + "#" * len(prompt))
+        input(Fore.MAGENTA + "Press enter once finished." + Style.RESET_ALL)
+        bot.wait_for_click_css("div.create_newaccount_ctn > button", timeout=2)
+
+        bot.enter_field('//*[@id="accountname"]', username)
+        bot.enter_field('//*[@id="password"]', password)
+        bot.enter_field('//*[@id="reenter_password"]', password)
         sleep(1)
-        driver.find_element(By.ID, "suggested_name_1").click()
-        username = driver.find_element(By.XPATH, '//*[@id="suggested_name_1"]').text
-        print(f"\tName taken. Changing name.\n\tNew name {username}")
-        notification("account name")
-        return username
-    return og_username
+        bot.wait_for_click('//*[@id="createAccountButton"]')
+        sleep(1)
+        print(Fore.LIGHTGREEN_EX + Style.BRIGHT + "Account successfully created")
+        print(f"Username: {username} | Password: {password} | Email: {email}")
+        send_to_webhook(email, username, password)
+        bot.close()
+    except Exception as error:
+        print(Fore.RED + "Error making account!", error)
+        error_webhook(email, username, password, error)
+        traceback.print_exc()
 
-# start
-def program_start():
-    os.system(clear_line)
-    welcome_message()
-    match (input("Input number you choose: ")):
-        case "1":
-            os.system(clear_line)
-            print('\tYou choose creating accounts from file')
-            launch_option("file_accounts")
-        case "2":
-            os.system(clear_line)
-            print('\tYou choose creating new accounts each time')
-            for i in range(int(input('\tHow many accounts would you like to generate? '))):
-                print(f"\tGenerating account nr {i+1}")
-                launch_option("new_account")
-        case "3":
-            os.system(clear_line)
-            print('\tYou choose creating accounts using your domain\t')
-            for i in range(int(input('\tHow many accounts would you like to generate? '))):
-                print(f"\tGenerating account nr {i+1}")
-                launch_option("domain")
-        case "4":
-            os.system(clear_line)
-            print('\tCreating example file')
-            create_new_example_file(input("\tWhat file name do you want: "))
-            print('\tDone! Check current folder')
-            sleep(3)
-            program_start()
-        case "5":
-            os.system(clear_line)
-            Help()
-            sleep(5)
-            program_start()
-        case "6":
-            os.system(clear_line)
-            Contact()
-            sleep(5)
-            program_start()
-        case other:
-            print(f"Incorrect input! {other}")
-            print('Restarting!')
-            sleep(5)
-            os.system(clear_line)
-            program_start()
 
 try:
-    program_start()
-    sleep(1)
+    if args.webhooktest:
+        print("Testing webhook...")
+        try:
+            test_webhook()
+            print(Fore.GREEN + "Webhook test successful!")
+        except Exception as err:
+            print(Fore.RED + "Webhook test failed!")
+            print(err)
+            exit(1)
+        exit(0)
+    if args.emails:
+        with open(args.emails, "r") as f:
+            emails = f.read().strip().splitlines()
+
+    for i in range(0, int(input("How many accounts to make?:"))):
+        if not args.emails:
+            email = input("Email:")
+        else:
+            email = emails.pop(0)
+            with open(args.emails, "w") as f:
+                f.write("\n".join(emails))
+        create_steam_account(
+            email,
+            username=random_string(16),
+            password=random_string(32),
+        )
 except Exception as err:
     print(err)
     print("Press any key to close the program...")

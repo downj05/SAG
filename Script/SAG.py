@@ -30,6 +30,14 @@ parser.add_argument(
     "-c", "--config", help="Config file", required=False, default="config.yml"
 )
 
+parser.add_argument(
+    "--executable",
+    help="specify where the chome.exe is",
+    required=False,
+    default=None,
+)
+
+
 args = parser.parse_args()
 
 init(autoreset=True)
@@ -55,6 +63,8 @@ user_agent_rotator = UserAgent(
     software_names=software_names, operating_systems=operating_systems, limit=100
 )
 
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 
 chrome_options = Options()
 chrome_options.add_argument("--log-level=3")
@@ -62,7 +72,8 @@ chrome_options.add_argument("--start-maximized")
 chrome_options.add_argument("--window-size=1920,1080")
 chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
 chrome_options.add_experimental_option("useAutomationExtension", False)
-
+if args.executable is not None:
+    chrome_options.binary_location = args.executable
 
 version = "2.2"
 url = "https://store.steampowered.com/join"
@@ -78,7 +89,11 @@ class Bot:
     def __init__(self, url):
         self.url = url
         print("Creating driver")
-        self.driver = webdriver.Chrome(options=chrome_options)
+        if args.executable is not None:
+            self.driver = webdriver.Chrome(options=chrome_options)
+        else:
+            self.driver = webdriver.Chrome(options=chrome_options)
+
         print("Applying stealth")
         user_agent = user_agent_rotator.get_random_user_agent()
         print(user_agent)
@@ -115,7 +130,8 @@ class Bot:
             try:
                 self.driver.find_element(By.XPATH, xpath).click()
                 break
-            except:
+            except Exception as e:
+                print(f"got {e} while waiting for {xpath}")
                 sleep(0.5)
 
     def wait_for_click_css(self, selector: str, timeout=4):
@@ -220,7 +236,6 @@ def create_steam_account(email, username, password):
         bot.enter_field('//*[@id="reenter_password"]', password)
         sleep(1)
         bot.wait_for_click('//*[@id="createAccountButton"]')
-        sleep(1)
         print(Fore.LIGHTGREEN_EX + Style.BRIGHT + "Account successfully created")
         print(f"Username: {username} | Password: {password} | Email: {email}")
         send_to_webhook(email, username, password)

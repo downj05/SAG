@@ -15,7 +15,7 @@ from PyQt5.QtCore import QThread
 EMAIL_REG = r"[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
 def get_current_ip():
     print('Getting current IP')
-    return requests.get('https://api.ipify.org').text
+    return requests.get('https://api.ipify.org', timeout=5).text
 
 
 def increment_ip_counter(ip):

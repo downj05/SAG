@@ -1,0 +1,1 @@
+pyinstaller --onedir --name SAG .\main.py

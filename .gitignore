@@ -13,6 +13,10 @@ chrome-win64/
 # Config file
 config.yml
 
+# JSON files for datastorage
+counter.json
+settings.json
+
 # C extensions
 *.so
 

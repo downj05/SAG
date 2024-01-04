@@ -1,58 +1,19 @@
 import os
 import random
-import string
 from time import sleep, time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 import discord
 from selenium_stealth import stealth
 from random_user_agent.user_agent import UserAgent
 from random_user_agent.params import SoftwareName, OperatingSystem
 from colorama import init, Fore, Back, Style
 import traceback
-import argparse
-import yaml
 
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-e",
-    "--emails",
-    help="File to read emails from, email will be removed from file after use",
-    required=False,
-)
-parser.add_argument(
-    "-w", "--webhooktest", help="Test webhook", required=False, action="store_true"
-)
-
-parser.add_argument(
-    "-c", "--config", help="Config file", required=False, default="config.yml"
-)
-
-parser.add_argument(
-    "--executable",
-    help="specify where the chome.exe is",
-    required=False,
-    default=None,
-)
-
-
-args = parser.parse_args()
 
 init(autoreset=True)
-
-# Import config.yml
-with open(args.config, "r") as f:
-    config = yaml.safe_load(f)
-
-WEBHOOK_URL = config["webhook"]
-if WEBHOOK_URL == "" or WEBHOOK_URL is None:
-    print("Please enter a discord webhook url in webhook.txt")
-    exit(1)
-WEBHOOK_BRAND = config["webhook_brand"]
-if WEBHOOK_BRAND == "" or WEBHOOK_BRAND is None:
-    WEBHOOK_BRAND = "W32 Account Generator"
 
 FACES = ["x3", ":(", ">.<", ":P"]
 
@@ -72,8 +33,6 @@ chrome_options.add_argument("--start-maximized")
 chrome_options.add_argument("--window-size=1920,1080")
 chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
 chrome_options.add_experimental_option("useAutomationExtension", False)
-if args.executable is not None:
-    chrome_options.binary_location = args.executable
 
 version = "2.2"
 url = "https://store.steampowered.com/join"
@@ -86,13 +45,12 @@ def chunks(xs, n):
 
 
 class Bot:
-    def __init__(self, url):
+    def __init__(self, url, chrome_executable_path=None):
         self.url = url
+        print("Creating service")
+        s = Service(executable_path=chrome_executable_path)
         print("Creating driver")
-        if args.executable is not None:
-            self.driver = webdriver.Chrome(options=chrome_options)
-        else:
-            self.driver = webdriver.Chrome(options=chrome_options)
+        self.driver = webdriver.Chrome(service=s, options=chrome_options)
 
         print("Applying stealth")
         user_agent = user_agent_rotator.get_random_user_agent()
@@ -116,6 +74,21 @@ class Bot:
         while True:
             try:
                 self.driver.find_element(By.XPATH, xpath)
+                break
+            except:
+                sleep(0.5)
+            finally:
+                if time() - s > timeout:
+                    print("Skipping because timeout")
+                    break
+
+    def wait_for_element_css(self, selector: str, timeout=4) -> 'Element':
+        print("Waiting for element " + selector)
+        s = time()
+        while True:
+            try:
+                e = self.driver.find_element(By.CSS_SELECTOR, selector)
+                return e
                 break
             except:
                 sleep(0.5)
@@ -169,51 +142,53 @@ class Bot:
     def close(self):
         self.driver.close()
 
-
-def send_to_webhook(email, username, password):
-    webhook = discord.SyncWebhook.from_url(WEBHOOK_URL)
-    embed = discord.Embed(title="New Steam Account!", color=0xEE00FF)
-    embed.set_author(name=f"{WEBHOOK_BRAND} Account Generator")
-    embed.add_field(name="Username", value=username, inline=True)
-    embed.add_field(name="Password", value=password, inline=True)
-    embed.add_field(name="Email", value=email, inline=False)
-    webhook.send(embed=embed)
+class Webhook:
+    def __init__(self, webhook_url: str, brand: str="No Brand") -> None:
+        self.brand = brand
+        self. webhook = discord.SyncWebhook.from_url(webhook_url)
 
 
-def test_webhook():
-    webhook = discord.SyncWebhook.from_url(WEBHOOK_URL)
-    embed = discord.Embed(
-        title="Webhook Test",
-        description="This is a test for the webhook feature of the account generator.",
-        color=0xA6A6A6,
-    )
-    embed.set_author(name=f"{WEBHOOK_BRAND} Account Generator")
-    embed.set_footer(text=random.choice(FACES))
-    webhook.send(embed=embed)
+    def send_to_webhook(self,email, username, password, steam_url=None, steam_id=None):
+        embed = discord.Embed(title="New Steam Account!", color=0xEE00FF)
+        embed.set_author(name=self.brand)
+        embed.add_field(name="Username", value=username, inline=True)
+        embed.add_field(name="Password", value=f"||{password}||", inline=True)
+        embed.add_field(name="Email", value=email, inline=False)
+        if steam_url:
+            embed.add_field(name="Steam URL", value=steam_url, inline=False)
+        if steam_id:
+            embed.add_field(name="Steam ID", value=steam_id, inline=False)
+        self.webhook.send(embed=embed)
+
+    def test_webhook(self):
+        embed = discord.Embed(
+            title="Webhook Test",
+            description="This is a test for the webhook feature of the account generator.",
+            color=0xA6A6A6,
+        )
+        embed.set_author(name=self.brand)
+        embed.set_footer(text=random.choice(FACES))
+        embed.add_field(name="Test", value="specialspecial123 [burger](https://burger.com)", inline=False)
+        self.webhook.send(embed=embed)
 
 
-def error_webhook(email, username, password, error):
-    webhook = discord.SyncWebhook.from_url(WEBHOOK_URL)
-    embed = discord.Embed(
-        title=f"Error Making Account! {random.choice(FACES)}",
-        description="Posting error so we don't lose the credentials incase the account was already made!",
-        color=0xFF0000,
-    )
-    embed.set_author(name=f"{WEBHOOK_BRAND} Account Generator")
-    embed.add_field(name="Username", value=username, inline=True)
-    embed.add_field(name="Password", value=password, inline=True)
-    embed.add_field(name="Email", value=email, inline=False)
-    embed.set_footer(text=error)
-    webhook.send(embed=embed)
+    def error_webhook(self, email, username, password, error):
+        embed = discord.Embed(
+            title=f"Error Making Account! {random.choice(FACES)}",
+            description="Posting error so we don't lose the credentials incase the account was already made!",
+            color=0xFF0000,
+        )
+        embed.set_author(name=self.brand)
+        embed.add_field(name="Username", value=username, inline=True)
+        embed.add_field(name="Password", value=password, inline=True)
+        embed.add_field(name="Email", value=email, inline=False)
+        embed.set_footer(text=error)
+        self.webhook.send(embed=embed)
 
-
-def random_string(length):
-    pool = string.ascii_letters + string.digits
-    return "".join(random.choice(pool) for i in range(length))
 
 
 # GENERATOR
-def create_steam_account(email, username, password):
+def create_steam_account(email, username, password, webhook: Webhook=None):
     try:
         print(
             f"{Fore.LIGHTYELLOW_EX}Making account with {email} | {username} | {password}"
@@ -224,12 +199,11 @@ def create_steam_account(email, username, password):
 
         bot.wait_for_click('//*[@id="i_agree_check"]')
 
-        prompt = "PLEASE COMPLETE THE CAPTCHA AND EMAIL VERIFICATION AND PRESS CONTINUE ON THE SITE"
+        prompt = "PLEASE COMPLETE THE CAPTCHA AND EMAIL VERIFICATION"
         print(Fore.LIGHTCYAN_EX + "#" * len(prompt))
         print(Style.BRIGHT + Fore.WHITE + prompt)
         print(Fore.LIGHTCYAN_EX + "#" * len(prompt))
-        input(Fore.MAGENTA + "Press enter once finished." + Style.RESET_ALL)
-        bot.wait_for_click_css("div.create_newaccount_ctn > button", timeout=2)
+        bot.wait_for_click_css("div.create_newaccount_ctn > button", timeout=1200)
 
         bot.enter_field('//*[@id="accountname"]', username)
         bot.enter_field('//*[@id="password"]', password)
@@ -238,42 +212,17 @@ def create_steam_account(email, username, password):
         bot.wait_for_click('//*[@id="createAccountButton"]')
         print(Fore.LIGHTGREEN_EX + Style.BRIGHT + "Account successfully created")
         print(f"Username: {username} | Password: {password} | Email: {email}")
-        send_to_webhook(email, username, password)
+        e = bot.wait_for_element_css('a.user_avatar', timeout=25)
+        print(e)
+        steam_url = e.get_attribute('href')
+        print(steam_url)
+        steam_id = steam_url.split('/profiles/')[1].replace('/', '')
+        if webhook:
+            webhook.send_to_webhook(email, username, password, steam_url=steam_url, steam_id=steam_id)
         bot.close()
     except Exception as error:
         print(Fore.RED + "Error making account!", error)
-        error_webhook(email, username, password, error)
+        if webhook:
+            webhook.error_webhook(email, username, password, error)
         traceback.print_exc()
-
-
-try:
-    if args.webhooktest:
-        print("Testing webhook...")
-        try:
-            test_webhook()
-            print(Fore.GREEN + "Webhook test successful!")
-        except Exception as err:
-            print(Fore.RED + "Webhook test failed!")
-            print(err)
-            exit(1)
-        exit(0)
-    if args.emails:
-        with open(args.emails, "r") as f:
-            emails = f.read().strip().splitlines()
-
-    for i in range(0, int(input("How many accounts to make?:"))):
-        if not args.emails:
-            email = input("Email:")
-        else:
-            email = emails.pop(0)
-            with open(args.emails, "w") as f:
-                f.write("\n".join(emails))
-        create_steam_account(
-            email,
-            username=random_string(16),
-            password=random_string(32),
-        )
-except Exception as err:
-    print(err)
-    print("Press any key to close the program...")
-    input()
+        raise error

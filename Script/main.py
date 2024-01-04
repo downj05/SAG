@@ -145,8 +145,18 @@ class GuiLogic(Ui_MainWindow):
         save_gui.init(self.usernameLengthSlider)
 
         self.generateAccountsButton.clicked.connect(self.generateAccount)
+        self.generateLabels = {True: 'Terminate', False: 'Generate Accounts'}
+
 
     def generateAccount(self):
+
+        # Toggle button text and functionality
+        self.generateAccountsButton.setText(self.generateLabels[self.generateAccountsButton.text() == 'Generate Accounts'])
+        if self.generateAccountsButton.text() == 'Terminate':
+            self.account_generator_thread.terminate()
+            self.generateAccountsButton.setText('Generate Accounts')
+            return
+
         print(self.title_thread.ip)
         if get_ip_counter(self.title_thread.ip) >= 1:
             last_update = get_last_update(self.title_thread.ip)
@@ -187,7 +197,7 @@ class GuiLogic(Ui_MainWindow):
     def testWebhook(self):
         print("Testing webhook...")
         try:
-            webhook = SAG.Webhook(self.webhookUrl.text(), BRAND_NAME)
+            webhook = SAG.Webhook(self.webhookUrl.text(), self.webhookBrand)
             webhook.test_webhook()
             print("Webhook test successful!")
             self.show_message('Success', 'Webhook test successful!')

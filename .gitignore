@@ -3,6 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Syncthing
+.stignore
+.stversions
+
+# Custom shortcuts
+*.lnk
+
 # Google chrome install
 chrome-win64/
 

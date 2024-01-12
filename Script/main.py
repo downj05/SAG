@@ -145,17 +145,25 @@ class GuiLogic(Ui_MainWindow):
         save_gui.init(self.usernameLengthSlider)
 
         self.generateAccountsButton.clicked.connect(self.generateAccount)
-        self.generateLabels = {True: 'Terminate', False: 'Generate Accounts'}
+        self.KILL_LABEL, self.START_LABEL = 'Terminate', 'Generate'
+        self.generateLabels = {True: self.KILL_LABEL, False: self.START_LABEL}
 
+
+        self.account_generator_thread = None
+        print("set account generator thread to none", type(self.account_generator_thread), f'{self.account_generator_thread is not None}')
 
     def generateAccount(self):
 
-        # Toggle button text and functionality
-        self.generateAccountsButton.setText(self.generateLabels[self.generateAccountsButton.text() == 'Generate Accounts'])
-        if self.generateAccountsButton.text() == 'Terminate':
+
+        if self.account_generator_thread is None:
+            self.generateAccountsButton.setText(self.KILL_LABEL)
+        else:
+            self.generateAccountsButton.setText(self.START_LABEL)
+            print("Terminating thread")
             self.account_generator_thread.terminate()
-            self.generateAccountsButton.setText('Generate Accounts')
+            self.account_generator_thread = None
             return
+        print(f'Generating account, {self.generateAccountsButton.text() == self.KILL_LABEL} {self.account_generator_thread is not None}')
 
         print(self.title_thread.ip)
         if get_ip_counter(self.title_thread.ip) >= 1:
@@ -182,17 +190,22 @@ class GuiLogic(Ui_MainWindow):
         self.account_generator_thread.account_failed.connect(lambda username, password, email: self.show_message('Error', f'Error creating account\n{username} | {password} | {email}'))
         self.account_generator_thread.start()
 
+
                                      
     def on_account_generated(self):
-        self.show_message('Success', 'Account created successfully!')
         # Increment IP Counter
         increment_ip_counter(self.title_thread.ip)
+
+        self.account_generator_thread = None
+        self.generateAccountsButton.setText(self.START_LABEL)
 
         # Increment Email Counter
         dots.increment_email_counter(self.uniqueEmailAddress.text())
 
         # Increase combo number
         self.emailCombinationNumber.setValue(self.emailCombinationNumber.value() + 1)
+        self.show_message('Success', 'Account created successfully!')
+
 
     def testWebhook(self):
         print("Testing webhook...")
